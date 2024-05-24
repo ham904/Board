@@ -1,0 +1,295 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<html lang="en">
+<head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous">
+
+    <title>Hello, world!</title>
+</head>
+<body>
+<!-- navigation -->
+<header class="p-3 bg-dark text-white">
+    <div class="container">
+        <div class="d-flex flex-wrap align-items-center justify-content-center justify-content-lg-start">
+            <a href="/" class="d-flex align-items-center mb-2 mb-lg-0 text-white text-decoration-none">
+                <svg class="bi me-2" width="40" height="32" role="img" aria-label="Bootstrap"><use xlink:href="#bootstrap"/></svg>
+            </a>
+
+            <ul class="nav col-12 col-lg-auto me-lg-auto mb-2 justify-content-center mb-md-0">
+                <li><a href="/articles" class="nav-link px-2 text-secondary">Home</a></li>
+            </ul>
+
+            <div class="text-end">
+        <span sec:authorize="isAnonymous()">
+          <button type="button" class="btn btn-outline-light me-2"
+                  onclick="window.location.href='/members/login'">로그인</button>
+        <button type="button" class="btn btn-warning" onclick="window.location.href='/members/signup'">회원가입</button>
+        </span>
+                <span sec:authorize="isAuthenticated()">
+          <span th:if="${member!=null}" th:text="${member.username}+'님 안녕하세요'"
+                style="margin-right:5px"></span>
+          <button type="button" class="btn btn-outline-light me-2" onclick="window.location.href='/members/logout'"
+          >로그아웃</button>
+        </span>
+            </div>
+        </div>
+    </div>
+</header>
+<div class="container" style="max-width: 800px">
+    <!-- 제목 -->
+    <div class="py-1 text-center border-3">
+        <h2>게시글 상세</h2>
+    </div>
+
+    <!-- 목록으로 -->
+    <div class="row">
+        <div class="col">
+            <button class="btn btn-primary py-2"
+                    onclick="location.href='/articles'"
+                    type="button">목록</button>
+        </div>
+        <th:block th:if="${memberId==article.member.id}">
+            <div class="col text-end">
+                <button class="btn btn-primary py-2"
+                        th:href="@{'/articles/' + ${article.id} + '/edit'}"
+                        type="button"
+                        onclick="window.location.href=this.getAttribute('href');">수정</button>
+                <button class="btn btn-outline-danger py-2"
+                        th:href="@{'/articles/' + ${article.id} + '/delete'}"
+                        type="button"
+                        onclick="window.location.href=this.getAttribute('href');">삭제</button>
+
+            </div>
+        </th:block>
+    </div>
+
+    <hr class="my-2">
+    <!-- 게시글 정보 한줄 -->
+    <div>
+        <span th:text="'번호 : ' + ${article.id} + ' | 작성자 : ' + ${article.member.username} + ' | 최종 수정일 : ' + ${#temporals.format(article.modifiedDate, 'yyyy.MM.dd HH:mm')} + ' | 조회수 : ' + ${article.views}"></span>
+    </div>
+
+    <hr class="my-2">
+
+    <!-- 글 내용 -->
+    <div class="container">
+        <div class="row">
+            <div class="col">
+                <div class="card">
+                    <div class="card-body">
+                        <h3 class="card-title" th:text="${article.title}"></h3>
+                        <hr class="my-2">
+                        <p class="card-text" th:text="${article.content}"></p>
+                    </div>
+                </div>
+                <br>
+            </div>
+        </div>
+    </div>
+</div><!-- /container -->
+<br>
+<!-- 댓글 컨테이너 -->
+<div class="container" style="max-width: 750px; background-color: #f5f5f5">
+    <!-- 댓글 리스트 -->
+    <div th:if="${commentDtos}" id="comment-list">
+        <div th:each="commentDto : ${commentDtos}">
+            <div class="card m-2">
+                <div class="card-body">
+                    <p class="card-title" th:text="'&#x1F4DD;' + ${commentDto.member.username}"></p>
+                    <div class="col" style="display:flex">
+                        <p class="card-text col" th:text="${commentDto.content}"></p>
+                        <th:block th:if="${memberId==commentDto.member.id}">
+                            <div class="col text-end">
+                                <button type="button"
+                                        class="btn btn-sm btn-outline-primary"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#comment-edit-modal"
+                                        th:data-bs-id="${commentDto.id}"
+                                        th:data-bs-username="${commentDto.member.username}"
+                                        th:data-bs-content="${commentDto.content}"
+                                        th:data-bs-article-id="${article.id}">수정</button>
+                                <button class="btn btn-sm btn-outline-danger"
+                                        type="button" th:id="'comment-delete-btn-' + ${commentDto.id}">삭제</button>
+                            </div>
+                        </th:block>
+                    </div>
+                </div>
+            </div>
+            <!-- 댓글 수정 모달 -->
+            <div class="modal fade" th:id="comment-edit-modal" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="exampleModalLabel">댓글 수정</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <!-- 댓글 수정 폼 -->
+                            <form>
+                                <!-- 댓글 본문 입력 -->
+                                <div class="mb-3">
+                                    <label class="form-label">댓글 내용</label>
+                                    <textarea type="text" class="form-control form-control-sm" rows="3" id="edit-comment-content"></textarea>
+                                </div>
+
+                                <!-- 히든 인풋 -->
+                                <input type="hidden" class="form-control form-control-sm" id="edit-comment-username"
+                                       th:value="${commentDto.member.username}">
+                                <input type="hidden" id="edit-comment-id">
+                                <input type="hidden" id="edit-comment-article-id">
+
+                                <!-- 전송 버튼 -->
+                                <button type="button" class="btn btn-outline-primary btn-sm" id="comment-update-btn">수정 완료</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- 댓글 작성 폼 -->
+    <form>
+        <div class="d-flex">
+        <textarea type="text" class="form-control m-2" rows="3"
+                  placeholder="댓글 작성" id="new-comment-content"></textarea>
+            <!-- 히든 인풋 -->
+            <input type="hidden" id="new-comment-article-id" th:value="${article.id}">
+            <input type="hidden" id="new-comment-member-id" th:value="${memberId}">
+            <button class="btn-outline-secondary btn m-2 text-nowrap" type="button"
+                    id="comment-create-btn">작성</button>
+        </div>
+    </form>
+</div>
+<script>
+
+    // 댓글 생성
+    {
+    // 댓글 생성 버튼 변수화
+    const commentCreateBtn = document.querySelector("#comment-create-btn");
+    // 댓글 클릭 이벤트 감지
+    commentCreateBtn.addEventListener("click", function() {
+        // memberId 가져오기
+        const memberId = document.querySelector("#new-comment-member-id").value;
+
+        if (memberId === "") {
+            alert("로그인 후에 이용해 주세요."); // memberId가 없으면 알림창 띄우기
+            return; // 함수 종료
+        }
+        // 새 댓글 객체 생성
+        const comment = {
+            // 새 댓글의 본문
+            content: document.querySelector("#new-comment-content").value,
+            // 부모 게시글의 id
+            articleId: document.querySelector("#new-comment-article-id").value
+        };
+        // fetch() - 비동기 통신을 위한 API
+        const url = "/api/articles/" + comment.articleId + "/comments";
+        fetch(url, {
+            method: "POST", // POST 요청
+            headers: {      // 전송 본문의 데이터 타입(JSON) 정보
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(comment) // comment 객체를 JSON 문자열로 변환해 전송
+        }).then(response => {
+            // HTTP 응답 코드에 따른 메시지 출력
+            //const msg = (response.ok) ? "댓글이 등록됐습니다." : "댓글 등록 실패..!";
+            //alert(msg);
+            // 현재 페이지 새로 고침
+            window.location.reload();
+
+        });
+    });
+    }
+
+    // 댓글 수정 모달창
+    {
+    const commentEditModal = document.querySelector("#comment-edit-modal");
+
+    // 각각의 댓글 수정 모달에 대한 이벤트 리스너 추가
+    if (commentEditModal) {
+        commentEditModal.addEventListener("show.bs.modal", event => {
+            const triggerBtn = event.relatedTarget;
+            const id = triggerBtn.getAttribute("data-bs-id");
+            const username = triggerBtn.getAttribute("data-bs-username");
+            const content = triggerBtn.getAttribute("data-bs-content");
+            const articleId = triggerBtn.getAttribute("data-bs-article-id");
+
+            document.querySelector("#edit-comment-username").value = username;
+            document.querySelector("#edit-comment-content").value = content;
+            document.querySelector("#edit-comment-id").value = id;
+            document.querySelector("#edit-comment-article-id").value = articleId;
+
+            // 댓글 수정 버튼 변수화
+            const commentUpdateBtn = document.querySelector("#comment-update-btn");
+            // 버튼 클릭 이벤트 감지
+            commentUpdateBtn.addEventListener("click", function() {
+                // 수정된 댓글 객체 생성
+                const updated = {
+                    // 수정된 댓글의 본문
+                    content: document.querySelector("#edit-comment-content").value,
+                    // 수정된 댓글의 id
+                    id: document.querySelector("#edit-comment-id").value
+                };
+                // fetch() - 비동기 통신을 위한 API
+                const url = "/api/comments/" + updated.id;
+                fetch(url, {
+                    method: "PATCH", // PATCH 요청
+                    headers: {      // 전송 본문의 데이터 타입(JSON) 정보
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify(updated) // updated 객체를 JSON 문자열로 변환해 전송
+                }).then(response => {
+                    // HTTP 응답 코드에 따른 메시지 출력
+                    const msg = (response.ok) ? "수정완료" : "수정실패";
+                    alert(msg);
+                    // 현재 페이지 새로 고침
+                    window.location.reload();
+                });
+            });
+        });
+    }
+    }
+
+
+
+    // 댓글 삭제
+    {
+    // 댓글 삭제 버튼 변수화
+    const commentDeleteBtns = document.querySelectorAll("[id^='comment-delete-btn-']");
+
+    // 각 댓글 삭제 버튼에 대한 클릭 이벤트 감지
+    commentDeleteBtns.forEach(btn => {
+        btn.addEventListener("click", function() {
+            // 삭제할 댓글의 ID 추출
+            const commentId = this.id.replace("comment-delete-btn-", "");
+
+            // 삭제 확인 여부 묻기 (예/아니오 다이얼로그)
+            const confirmDelete = confirm("정말로 이 댓글을 삭제하시겠습니까?");
+
+            // 확인 버튼을 눌렀을 때만 삭제 수행
+            if (confirmDelete) {
+                // fetch() - 비동기 통신을 위한 API
+                const url = "/api/comments/" + commentId;
+                fetch(url, {
+                    method: "DELETE" // DELETE 요청
+                }).then(response => {
+                    // HTTP 응답 코드에 따른 메시지 출
+                    // 현재 페이지 새로 고침
+                    window.location.reload();
+                });
+            }
+        });
+    });
+    }
+
+
+</script>
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js" defer integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM" crossorigin="anonymous"></script>
+</body>
+</html>
