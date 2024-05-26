@@ -5,4 +5,4 @@
 2024.04.05 ~ 2024.05.15
 
 # 메인화면
-![메인화면](https://github.com/ham904/Board/tree/master/src#:~:text=images-,%EC%8A%A4%ED%81%AC%EB%A6%B0%EC%83%B7,-2024%2D05%2D26)
+![메인화면](src/main/resources/images/스크린샷 2024-05-26 오후 7.49.58.png)
