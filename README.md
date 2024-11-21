@@ -1,6 +1,3 @@
-# 메인화면
-[게시판 바로가기](http://43.202.221.44:8080/articles)
-![메인화면](https://github.com/ham904/Board/assets/141111846/dd93b4aa-4e84-431d-a9a0-6c945db85c8c)
 
 # 게시판 서비스
 ## 개요
@@ -314,4 +311,6 @@ public Page<Article> index(int page, String kw, String searchOption) {
         return this.articleRepository.findAll(spec,pageable);
     }
 ~~~
-   
+<br/>
+# 메인화면
+![메인화면](https://github.com/ham904/Board/assets/141111846/dd93b4aa-4e84-431d-a9a0-6c945db85c8c)
