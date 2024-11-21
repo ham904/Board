@@ -9,6 +9,12 @@
 #### 만든 목적
 - JAVA Spring boot를 이용한 백엔드 프로세스 학습
 
+#### 주요 기능
+- 회원가입 및 로그인 (Spring Security)
+- 게시글 CRUD
+- 댓글 CRUD
+- 페이징 및 검색 기능
+
 #### 일정
 - 24.04.05 ~ 24.05.15
 - 참여도 : 100% (개인 프로젝트)
@@ -17,137 +23,201 @@
 - O/S : macOS 10.15.1
 - Server : Apache Tomcat 10.1.19
 - DB : MySQL
-- Framework/Flatform : Spring Boot, SpringSecurity
+- 백엔드 : Spring Boot, SpringSecurity
+- 프론트엔드 :  Thymeleaf, Bootstrap
 - Language : JAVA, Javascript, HTML5, CSS3
 - Tool : IntelliJ, GitHub
 
 ## 내용
 #### 구현 기능
-- 구현
+- 회원가입 및 로그인
 
-- 로그인<br/>
-
-Spring Security dependency 주입
-
-pom.xml 일부
-~~~xml
-        <!-- spring security -->
-	<!-- https://mvnrepository.com/artifact/org.springframework.security/spring-security-web -->
-	<dependency>
-		<groupId>org.springframework.security</groupId>
-		<artifactId>spring-security-web</artifactId>
-		<version>5.0.6.RELEASE</version>
-	</dependency>
-	<!-- https://mvnrepository.com/artifact/org.springframework.security/spring-security-config -->
-	<dependency>
-		<groupId>org.springframework.security</groupId>
-		<artifactId>spring-security-config</artifactId>
-		<version>5.0.6.RELEASE</version>
-	</dependency>
-
-	<dependency>
-		<groupId>org.springframework.security</groupId>
-		<artifactId>spring-security-core</artifactId>
-		<version>5.0.6.RELEASE</version>
-	</dependency>
-
-	<dependency>
-		<groupId>org.springframework.security</groupId>
-		<artifactId>spring-security-taglibs</artifactId>
-		<version>5.0.6.RELEASE</version>
+회원가입
+MemberController 일부
+~~~java
+	@PostMapping("/members/signup")
+    	public String signup(@Valid MemberCreateForm memberCreateForm, BindingResult bindingResult) {
+	        if (bindingResult.hasErrors()) {
+	            return "members/signup_form";
+        	}
+	        // 비밀번호 확인
+	        if (!memberCreateForm.getPassword1().equals(memberCreateForm.getPassword2())) {
+	            bindingResult.rejectValue("password2", "passwordInCorrect",
+	                    "2개의 패스워드가 일치하지 않습니다.");
+	            return "members/signup_form";
+	        }
+	
+	        // 이미 등록된 사용자인지 확인
+	        if (!memberRepository.findByUsername(memberCreateForm.getUsername()).isEmpty()) {
+	            bindingResult.rejectValue("username", "usernameExists",
+	                    "이미 사용 중인 사용자 이름입니다."); // 이미 등록된 사용자인 경우 에러 처리
+	            return "members/signup_form";
+	        }
+	
+	        // 이미 등록된 email인지 확인
+	        if (!memberRepository.findByEmail(memberCreateForm.getEmail()).isEmpty()) {
+	            bindingResult.rejectValue("email", "emailExists",
+	                    "이미 사용 중인 email입니다."); // 이미 등록된 email인 경우 에러 처리
+	            return "members/signup_form";
+	        }
+	
+	        Member member = new Member();
+	        member.setUsername(memberCreateForm.getUsername());
+	        member.setEmail(memberCreateForm.getEmail());
+	        member.setPassword(passwordEncoder.encode(memberCreateForm.getPassword1()));
+	        memberRepository.save(member);
+	        return "redirect:/articles";
+    	}
 ~~~
-로그인,자동 로그인, 로그아웃 설정
 
-security-context.xml 일부
-~~~xml
-	<bean id="customLoginSuccess" class="kr.co.sunmoon.security.CustomLoginSuccessHandler"></bean>	
+로그인
 
-	<security:form-login login-page="/cdims_login" authentication-success-handler-ref="customLoginSuccess"/>
-	<security:logout logout-url="/cdims_logout" invalidate-session="true" delete-cookies="remember-me,JSESSION_ID" />
-	<security:remember-me data-source-ref="dataSource" token-validity-seconds="604800" />
+SecurityConfig.java 일부
+~~~java
+	@Bean
+	SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        	http
+                .authorizeHttpRequests((authorizeHttpRequests) -> authorizeHttpRequests
+                        .requestMatchers(new AntPathRequestMatcher("/**")).permitAll())
+                .headers((headers) -> headers
+                        .addHeaderWriter(new XFrameOptionsHeaderWriter(
+                                XFrameOptionsHeaderWriter.XFrameOptionsMode.SAMEORIGIN)))
+                .formLogin((formLogin) -> formLogin
+                        .loginPage("/members/login")
+                        .defaultSuccessUrl("/articles"))
+                .logout((logout) -> logout
+                        .logoutRequestMatcher(new AntPathRequestMatcher("/members/logout"))
+                        .logoutSuccessUrl("/articles")
+                        .invalidateHttpSession(true))
+                .csrf(AbstractHttpConfigurer::disable);
+        	
+        	return http.build();
+    	}
 ~~~
 ---
-- 신청서 작성 (지원 신청서, 결과 보고서) <br/>
-<br/><br/>
-1. 지원신청서, 결과보고서 목록 REST 방식을 이용해 (년도, 학기, 과목, 분반) 데이터를 보내 결과 리스트를 json 형태로 데이터 가져옴 
 
-cdims_result_report.jsp 일부
-~~~js
-$(document).on('click', '#searchBtn', function() {
-			
-	var yearValue = document.querySelector('#year').value;
-	var semester = document.querySelector('#semester').value;
-	var subjectName = document.querySelector('#subject_name').value;
-	var division = document.querySelector('#division').value;
+- 게시글 CRUD <br/>
 
-	console.log(yearValue + ", " + semester + ", " + subjectName + ", " + division);
-
-	resultreportService.getList({year:yearValue, semester:semester, subjectname:subjectName, division:division}, 
-		function(data) {
-
-		console.log("data : " + JSON.stringify(data));
-		console.log("data list : " + JSON.stringify(data.length));
-
-		if (JSON.stringify(data.length) == 0) {
-			alert("조회 결과가 없습니다.");
-		} else {
-			console.log("bno : " + data[0].bno + ", teamno : " + data[0].teamno);
-		}
-
-		var innerHTML = '';
-		for (var i = 0, len = data.length || 0; i < len; i++) {
-			innerHTML+='<tr onclick="listlink('+data[i].bno+', '+data[i].teamno+');" style="cursor:pointer;">';
-			innerHTML+='<td>'+ data[i].projectTitle+'</td>';
-			innerHTML+='<td>'+data[i].teamName+'</td>';
-			innerHTML+='<td>'+data[i].division+'</td>';
-			innerHTML+='<td>'+data[i].professorCharge+'</td>';
-			innerHTML+='<td>'+data[i].approval+'</td>';
-			innerHTML+='</tr>';
-		}
-
-		$('tbody').html(innerHTML);
-	}); //end function
-});
-~~~ 
-
-result-report.js 일부
-~~~js
-var resultreportService = (function() {
-
-function getList(param, callback, error) {
-	var year = param.year;
-	var semester = param.semester;
-	var subjectName = param.subjectname;
-	var division = param.division;
-
-	$.getJSON("/result_report/list/" + year + "/" + semester + "/" + subjectName + "/" + division + ".json",
-		function(data) {
-			if (callback) {
-				callback(data); //댓글 숫자와 목록을 가져오는 경우
-			}
-		}).fail(function(xhr, status, err) {
-			if (error) {	
-				error();
-			}
-	});
-}
-~~~ 
-
-ResultReportRestController.java 일부
+ArticleController.java 일부
 ~~~java
-@GetMapping(value = "/list/{year}/{semester}/{subjectname}/{division}",
-		produces = {MediaType.APPLICATION_XML_VALUE,
-				MediaType.APPLICATION_JSON_UTF8_VALUE})
-public ResponseEntity<List<ResultReportVO>> getList(@PathVariable("year") String year, @PathVariable("semester") String semester,
-		@PathVariable("subjectname") String subjectname, @PathVariable("division") String division) {
+	@PostMapping("/articles/create")
+    	public String createArticle(ArticleForm articleForm, Principal principal) {
+	        Article article = articleService.create(articleForm, principal);
+	        // return "redirect:/articles/" + saved.getId(); 새 글 작성 후 해당 게시글 상세 페이지로 이동
+	        return "redirect:/articles"; // 전체 게시글 목록으로 이
+    	}
 
-	log.info("getList year : " + year + ", " + "semester : " + semester + "," + "subject : " + subjectname + "," + "division: " + division);
-
-	return new ResponseEntity<>(resultReportService.getList(year, semester, subjectname, division), HttpStatus.OK);
-}
+    	@GetMapping("/articles/{id}")
+    	public String show(@PathVariable Long id, Model model, Principal principal) {
+		Article article = articleService.show(id);
+	        List<CommentDto> commentDtos = commentService.comments(id);
+	        // 2. 모델에 데이터 등록하기
+	        model.addAttribute("article", article);
+	        model.addAttribute("commentDtos", commentDtos);
+	        // 로그인 상태를 확인하여 사용자 정보를 모델에 추가
+	        if (principal != null) {
+	            Optional<Member> member = memberRepository.findByUsername(principal.getName());
+	            Long memberId = member.isPresent() ? member.get().getId() : null;
+	            model.addAttribute("memberId", memberId);
+	        }
+	        else {
+	            model.addAttribute("memberId", null);
+	        }
+	        // 3. 뷰 페이지 반환하기
+	        return "articles/show";
+    	}
+	@PostMapping("articles/update")
+    	public String update(ArticleForm articleForm) {
+        	Article updated = articleService.update(articleForm);
+        	return "redirect:/articles";
+    	}
+    	@GetMapping("articles/{id}/delete")
+    	public String delete(@PathVariable Long id) {
+        	Article article = articleService.delete(id);
+        	return "redirect:/articles";
+    	}
 ~~~ 
 
-ResultReportServiceImpl.java 일부
+ArticleService.java 일부
+~~~java
+    public Article show(Long id) {
+        Article article = articleRepository.findById(id).orElse(null);
+        articleRepository.updateView(id);
+        return article;
+    }
+
+    public Article create(ArticleForm dto, Principal principal) {
+        // 1. DTO를 엔티티로 변환
+        Article article = dto.toEntity();
+        log.info(article.toString());
+        if (article.getMember() == null) {
+            article.setMember(memberRepository.findByUsername(principal.getName()).get());
+        }
+
+        // 2. 리파지터리로 엔티티를 DB에 저장
+        Article saved = articleRepository.save(article);
+        return saved;
+    }
+    public Article update(ArticleForm dto) {
+        Article article = dto.toEntity();
+        Article target = articleRepository.findById(article.getId()).orElse(null);
+        if (target == null) {
+            return null;
+	}
+        target.patch(article);
+        Article updated = articleRepository.save(target);
+        return updated;
+    }
+
+    public Article delete(Long id) {
+        Article target = articleRepository.findById(id).orElse(null);
+        if (target == null) {
+            return null;
+        }
+        articleRepository.delete(target);
+        return target;
+    }
+~~~ 
+
+- 댓글 CRUD
+
+CommentApiController.java
+~~~java
+@GetMapping("/api/articles/{articleId}/comments")
+    public ResponseEntity<List<CommentDto>> comments(@PathVariable Long articleId) {
+        // 서비스에 위임
+        List<CommentDto> dtos = commentService.comments(articleId);
+        // 결과 응답
+        return ResponseEntity.status(HttpStatus.OK).body(dtos);
+    }
+    // 2. 댓글 생성
+    @PostMapping("/api/articles/{articleId}/comments")
+    public ResponseEntity<CommentDto> create(@PathVariable Long articleId, @RequestBody CommentDto dto
+                                            , Principal principal) {
+        // 서비스에 위임
+        CommentDto commentDto = commentService.create(articleId, dto, principal);
+        // 결과 응답
+        return ResponseEntity.status(HttpStatus.OK).body(commentDto);
+    }
+    // 3. 댓글 수정
+    @PatchMapping("/api/comments/{id}")
+    public ResponseEntity<CommentDto> update(@PathVariable Long id, @RequestBody CommentDto dto) {
+        // 서비스에 위임
+        CommentDto updatedDto = commentService.update(id, dto);
+        // 결과 응답
+        return ResponseEntity.status(HttpStatus.OK).body(updatedDto);
+    }
+    // 4. 댓글 삭제
+    @DeleteMapping("/api/comments/{id}")
+    public ResponseEntity<CommentDto> delete(@PathVariable Long id) {
+        // 서비스에 위임
+        CommentDto deletedDto = commentService.delete(id);
+        // 결과 응답
+        return ResponseEntity.status(HttpStatus.OK).body(deletedDto);
+    }
+~~~ 
+
+CommentService.java 일부
 ~~~java
 @Override
 public List<ResultReportVO> getList(String year, String semester, String subjectname, String division) {
@@ -489,13 +559,12 @@ public List<BoardAttachVO> getAttachList(Long bno) {
 #### 산출물
 - 요구사항 정의서
 
-![캡디통합관리_요구사항정의서](https://user-images.githubusercontent.com/68316076/87619085-4b243380-c756-11ea-91e3-6b97bf450be0.PNG)
+image
 
 - Flowchart
 
-<img width="982" alt="스크린샷 2020-07-16 오전 9 58 31" src="https://user-images.githubusercontent.com/68316076/87618863-d3560900-c755-11ea-8b80-78c1190ba0d9.png">
+image
 
 - ERD <br>
-https://www.erdcloud.com/d/yTLGLXQKajRkhoXqy
-
-<img width="1299" alt="스크린샷 2020-07-16 오전 10 02 26" src="https://user-images.githubusercontent.com/68316076/87618878-de109e00-c755-11ea-9a50-be1294e5a447.png">
+url
+image
